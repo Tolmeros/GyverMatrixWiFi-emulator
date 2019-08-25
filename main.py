@@ -18,12 +18,16 @@ class GywerMatrixUDPServer(object):
         self.local_port = local_port
         self.local_ip = local_ip
         self.buffer_size  = buffer_size
+
+        self.__acknowledge_counter = 0
+
         self.udp = socket.socket(
             family=socket.AF_INET,
             type=socket.SOCK_DGRAM,
         )
         self.udp.bind((self.local_ip, self.local_port))
-        self.__acknowledge_counter = 0
+
+        
         self.BTcontrol = True
         self.AUTOPLAY = True
         self.globalBrightness = self.BRIGHTNESS
