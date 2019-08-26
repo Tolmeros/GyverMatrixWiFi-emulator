@@ -24,6 +24,19 @@ class GywerMatrix(object):
         self.__auto_play_time = 6000 #?
         self.__idle_time = 6000 #?
         self.__global_color = 0xFFFFFF
+        self.__drawing_flag = False
+        self.__running_flag = False #?
+
+        self.__matrix = [
+            [0 for x in range(self.__width)] for y in range(self.__height)
+        ]
+
+    def draw_pixel_xy(self, x, y, color):
+        print('draw x:{} y:{} color:{}'.format(x,y,color))
+        if (x >= 0) and (x < self.__width) and (y >= 0) and (y < self.__height):
+            self.__matrix[x][y] = color
+        else:
+            raise ValueError('Out of matrix range.')
 
     @property
     def auto_play_time(self):
@@ -35,6 +48,22 @@ class GywerMatrix(object):
             self.__auto_play_time = value
         else:
             raise ValueError('Value must be positive.')
+
+    @property
+    def drawing_flag(self):
+        return self.__drawing_flag
+
+    @drawing_flag.setter
+    def drawing_flag(self, value):
+        self.__drawing_flag = bool(value)
+
+    @property
+    def running_flag(self):
+        return self.__running_flag
+
+    @running_flag.setter
+    def running_flag(self, value):
+        self.__running_flag = bool(value)
 
     @property
     def idle_time(self):
@@ -204,12 +233,23 @@ class GywerMatrixUDPServer(object):
             self.matrix.auto_brightness = cmd[1]
             self.matrix.auto_brightness_minimal = cmd[2]
 
+    def __draw(self, data, cmd):
+        self.matrix.manual_control = True
+        self.matrix.drawing_flag = True
+        self.matrix.running_flag = False
+
+        #game mode!
+        #color effect!
+
+        #gamma_correction!
+        self.matrix.draw_pixel_xy(cmd[0], cmd[1], self.matrix.global_color)
+
+
+
     def parse(self, data):
         switcher = {
-            4: {
-                0:self.__set_brightnest,
-                1:self.__set_brightnest,
-            },
+            1: self.__draw,
+            4: self.__set_brightnest,
             18: {
                 0: self.__upd_send_acknowledge,
                 'else': self.__send_page_params,
@@ -240,12 +280,13 @@ class GywerMatrixUDPServer(object):
 
 
         if cmd[0] in switcher:
-            if cmd[1] in switcher[cmd[0]]:
-                switcher[cmd[0]][cmd[1]](data, cmd[1:])
-            elif 'else' in switcher[cmd[0]]:
-                switcher[cmd[0]]['else'](data, cmd[1:])
-
-
+            try:
+                if cmd[1] in switcher[cmd[0]]:
+                    switcher[cmd[0]][cmd[1]](data, cmd[1:])
+                elif 'else' in switcher[cmd[0]]:
+                    switcher[cmd[0]]['else'](data, cmd[1:])
+            except TypeError:
+                switcher[cmd[0]](data, cmd[1:])
 
 
     def run(self):
