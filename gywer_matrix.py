@@ -244,10 +244,13 @@ class GywerMatrixUDPServer(object):
         #gamma_correction!
         self.matrix.draw_pixel_xy(cmd[0], cmd[1], self.matrix.global_color)
 
+    def __set_global_color(self, data, cmd):
+        self.matrix.global_color = cmd[0]
 
 
     def parse(self, data):
         switcher = {
+            0: self.__set_global_color,
             1: self.__draw,
             4: self.__set_brightnest,
             18: {
@@ -262,7 +265,7 @@ class GywerMatrixUDPServer(object):
         # try
         message = msg.decode('utf-8') # ?
         # print(message)
-        command = re.search(r'^\$([0-9\. ]+);$', message)
+        command = re.search(r'^\$([0-9a-fA-F\. ]+);$', message)
         print(command.group(1))
 
         #cmd = [int(x) for x in command.group(1).split()]
@@ -271,7 +274,13 @@ class GywerMatrixUDPServer(object):
             try:
                 cmd.append(int(x))
             except ValueError:
-                pass
+                try:
+                    cmd.append(int(x, 16))
+                except ValueError:
+                    pass
+                else:
+                    continue
+
             else:
                 continue
 
