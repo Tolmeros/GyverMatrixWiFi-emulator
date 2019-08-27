@@ -224,7 +224,7 @@ class GywerMatrixProtocol(object):
             self.matrix.auto_brightness = cmd[1]
             self.matrix.auto_brightness_minimal = cmd[2]
 
-    def __draw(self, data, cmd):
+    def __draw(self, cmd):
         self.matrix.manual_control = True
         self.matrix.drawing_flag = True
         self.matrix.running_flag = False
@@ -295,5 +295,6 @@ class UDPHandler(socketserver.BaseRequestHandler):
         data, socket = self.request
         
         reply = self.server.protocol.parse(data.decode('utf-8'))
-        socket.sendto(reply.encode(), self.client_address)
+        if reply:
+            socket.sendto(reply.encode(), self.client_address)
 
