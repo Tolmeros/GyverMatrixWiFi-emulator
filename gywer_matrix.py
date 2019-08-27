@@ -293,6 +293,7 @@ class UDPThreaded(socketserver.ThreadingMixIn, socketserver.UDPServer):
 class UDPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         data, socket = self.request
+        
         reply = self.server.protocol.parse(data.decode('utf-8'))
-        self.socket.sendto(reply.encode(), self.client_address)
+        socket.sendto(reply.encode(), self.client_address)
 
