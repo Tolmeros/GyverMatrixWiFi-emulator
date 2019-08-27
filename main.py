@@ -1,10 +1,27 @@
+import threading
 
-from gywer_matrix import GywerMatrixUDPServer, GywerMatrix
+from gywer_matrix import GywerMatrixProtocol, GywerMatrix, UDPThreaded, UDPHandler
 
 
 if __name__ == '__main__':
-    server = GywerMatrixUDPServer(GywerMatrix(32, 32))
+    ip, port = '0.0.0.0', 2390
+
+    protocol = GywerMatrixProtocol(GywerMatrix(32, 32))
+    server = UDPThreaded((ip, port), UDPHandler, protocol)
+
+    server_thread = threading.Thread(target=server.serve_forever)
+
+    # exit the server thread when the main thread terminates
+    server_thread.daemon = True
+
+    server_thread.start()
+
+    print('Server started.')
     try:
-        server.run()
+        while True:
+            pass
     except KeyboardInterrupt:
         pass
+
+    server.shutdown()
+    print('Server stoped.')

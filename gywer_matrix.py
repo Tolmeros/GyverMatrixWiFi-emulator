@@ -1,6 +1,11 @@
+#!/usr/bin/env python
+try:
+    import socketserver
+except ImportError: # Python 2:
+    import SocketServer as socketserver
+
 import re
 import socket
-#import tkinter
 
 
 class GywerMatrix(object):
@@ -146,7 +151,7 @@ class GywerMatrix(object):
 
 
         
-class GywerMatrixUDPServer(object):
+class GywerMatrixProtocol(object):
     EFFECT_LIST = "Дыхание,Цвета,Снегопад,Шарик,Радуга,Радуга пикс,Огонь,\
                   The Matrix,Шарики,Часы,Звездопад,Конфетти,Радуга \
                   диагональная,Цветной шум,Облака,Лава,Плазма,Радужные \
@@ -162,32 +167,18 @@ class GywerMatrixUDPServer(object):
                  Морской прибой,Рассвет,Анимация 1,Анимация 2,Анимация 3,\
                  Анимация 4,Анимация 5"
 
-
-    """docstring for GywerMatrixUDPServer"""
-    def __init__(self, matrix_object=GywerMatrix(), local_port=2390,
-                 local_ip='0.0.0.0', buffer_size=1024):
-        super(GywerMatrixUDPServer, self).__init__()
-
-        self.local_port = local_port
-        self.local_ip = local_ip
-        self.buffer_size = buffer_size
+    def __init__(self, matrix_object=GywerMatrix()):
+        super(GywerMatrixProtocol, self).__init__()
 
         self.matrix = matrix_object
         self.__acknowledge_counter = 0
 
-        self.udp = socket.socket(
-            family=socket.AF_INET,
-            type=socket.SOCK_DGRAM,
-        )
-        self.udp.bind((self.local_ip, self.local_port))
-       
-    def __upd_send_acknowledge(self, data, cmd):
-        print('ack')
+    def __send_acknowledge(self, cmd=None):
         reply = 'ack {:d};'.format(self.__acknowledge_counter)
         self.__acknowledge_counter += 1
-        self.udp.sendto(str.encode(reply), data[1])
+        return reply
 
-    def __send_page_params(self, data, cmd):
+    def __send_page_params(self, cmd):
 
         print('__send_page_params')
         switcher = {
@@ -222,9 +213,9 @@ class GywerMatrixUDPServer(object):
         try:
             reply = '$18 {};'.format(switcher[cmd[0]]())
         except KeyError:
-            self.__upd_send_acknowledge(data)
+            self.__send_acknowledge()
         else:
-            self.udp.sendto(str.encode(reply), data[1])
+            return reply
 
     def __set_brightnest(self, data, cmd):
         if cmd[0] == 0:
@@ -248,27 +239,22 @@ class GywerMatrixUDPServer(object):
         self.matrix.global_color = cmd[0]
 
 
-    def parse(self, data):
+    def parse(self, message):
         switcher = {
             0: self.__set_global_color,
             1: self.__draw,
             4: self.__set_brightnest,
             18: {
-                0: self.__upd_send_acknowledge,
+                0: self.__send_acknowledge,
                 'else': self.__send_page_params,
             },
 
         }
 
-        msg = data[0]
-
-        # try
-        message = msg.decode('utf-8') # ?
         # print(message)
         command = re.search(r'^\$([0-9a-fA-F\. ]+);$', message)
         print(command.group(1))
 
-        #cmd = [int(x) for x in command.group(1).split()]
         cmd = []
         for x in command.group(1).split():
             try:
@@ -291,16 +277,22 @@ class GywerMatrixUDPServer(object):
         if cmd[0] in switcher:
             try:
                 if cmd[1] in switcher[cmd[0]]:
-                    switcher[cmd[0]][cmd[1]](data, cmd[1:])
+                    return switcher[cmd[0]][cmd[1]](cmd[1:])
                 elif 'else' in switcher[cmd[0]]:
-                    switcher[cmd[0]]['else'](data, cmd[1:])
+                    return switcher[cmd[0]]['else'](cmd[1:])
             except TypeError:
-                switcher[cmd[0]](data, cmd[1:])
+                return switcher[cmd[0]](cmd[1:])
 
 
-    def run(self):
-        while(True):
-            recieved = self.udp.recvfrom(self.buffer_size)
-            print('Message from Client:{} \n'
-                  'Client IP Address:{}'.format(recieved[0],recieved[1]))
-            self.parse(recieved)
+class UDPThreaded(socketserver.ThreadingMixIn, socketserver.UDPServer):
+    def __init__(self, server_address, RequestHandlerClass, protocol):
+        socketserver.UDPServer.__init__(self, server_address, RequestHandlerClass)
+        self.protocol = protocol
+
+
+class UDPHandler(socketserver.BaseRequestHandler):
+    def handle(self):
+        data, socket = self.request
+        reply = self.server.protocol.parse(data.decode('utf-8'))
+        self.socket.sendto(reply.encode(), self.client_address)
+
