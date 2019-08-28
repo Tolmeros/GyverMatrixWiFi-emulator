@@ -33,11 +33,9 @@ class GywerMatrix(object):
         self.__drawing_flag = False
         self.__running_flag = False #?
 
-        self.__matrix = [
-            [0 for x in range(self.__width)] for y in range(self.__height)
-        ]
-
         self.updated = threading.Event()
+
+        self.clear()
 
     def draw_pixel_xy(self, x, y, color):
         print('draw x:{} y:{} color:{}'.format(x,y,color))
@@ -46,6 +44,12 @@ class GywerMatrix(object):
             self.updated.set()
         else:
             raise ValueError('Out of matrix range.')
+
+    def clear(self):
+        self.__matrix = [
+            [0 for x in range(self.__width)] for y in range(self.__height)
+        ]
+        self.updated.set()
 
     @property
     def matrix(self):
@@ -246,12 +250,33 @@ class GywerMatrixProtocol(object):
     def __set_global_color(self, cmd):
         self.matrix.global_color = cmd[0]
 
+    def __receive_image(self, cmd):
+        self.matrix.manual_control = True
+        self.matrix.running_flag = False
+
+        if not self.matrix.drawing_flag:
+            self.matrix.clear()
+            self.matrix.drawing_flag = True
+
+        y = cmd[0]
+        row = list(zip(cmd[1::2], cmd[2::2]))
+
+        for color, x in row:
+            if (x == 0) and (y == 0):
+                self.matrix.clear()
+
+            self.matrix.draw_pixel_xy(x, self.matrix.height-y-1, color)
+            last_x = x
+        reply = '$5 {1}-{0} {2}'.format(x, y, self.__send_acknowledge())
+        print(reply)
+        return reply
 
     def parse(self, message):
         switcher = {
             0: self.__set_global_color,
             1: self.__draw,
             4: self.__set_brightnest,
+            5: self.__receive_image,
             18: {
                 0: self.__send_acknowledge,
                 'else': self.__send_page_params,
