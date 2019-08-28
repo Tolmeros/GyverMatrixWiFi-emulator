@@ -6,6 +6,7 @@ except ImportError: # Python 2:
 
 import re
 import socket
+import threading
 
 
 class GywerMatrix(object):
@@ -36,12 +37,19 @@ class GywerMatrix(object):
             [0 for x in range(self.__width)] for y in range(self.__height)
         ]
 
+        self.updated = threading.Event()
+
     def draw_pixel_xy(self, x, y, color):
         print('draw x:{} y:{} color:{}'.format(x,y,color))
         if (x >= 0) and (x < self.__width) and (y >= 0) and (y < self.__height):
             self.__matrix[x][y] = color
+            self.updated.set()
         else:
             raise ValueError('Out of matrix range.')
+
+    @property
+    def matrix(self):
+        return self.__matrix
 
     @property
     def auto_play_time(self):
@@ -217,7 +225,7 @@ class GywerMatrixProtocol(object):
         else:
             return reply
 
-    def __set_brightnest(self, data, cmd):
+    def __set_brightnest(self, cmd):
         if cmd[0] == 0:
             self.matrix.global_brightness = cmd[1]
         elif cmd[0] == 1:
@@ -235,7 +243,7 @@ class GywerMatrixProtocol(object):
         #gamma_correction!
         self.matrix.draw_pixel_xy(cmd[0], cmd[1], self.matrix.global_color)
 
-    def __set_global_color(self, data, cmd):
+    def __set_global_color(self, cmd):
         self.matrix.global_color = cmd[0]
 
 
@@ -251,12 +259,24 @@ class GywerMatrixProtocol(object):
 
         }
 
-        # print(message)
-        command = re.search(r'^\$([0-9a-fA-F\. ]+);$', message)
-        print(command.group(1))
+        print(message)
+        full_command = re.search(r'^\$([0-9a-fA-F\. ]+);$', message)
+        command_begin = re.search(r'^\$([0-9a-fA-F\.| ]+)$', message)
+        command_middle = re.search(r'^([0-9a-fA-F\.| ]+)$', message)
+        command_end = re.search(r'^([0-9a-fA-F\.| ]+);$', message)
+
+        command = full_command or command_begin
+
+        command = command.group(1)
+
+        print(command)
+
+
+        command = command.replace('|', ' ')
+        command = command.split()
 
         cmd = []
-        for x in command.group(1).split():
+        for x in command:
             try:
                 cmd.append(int(x))
             except ValueError:
@@ -293,7 +313,6 @@ class UDPThreaded(socketserver.ThreadingMixIn, socketserver.UDPServer):
 class UDPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         data, socket = self.request
-        
         reply = self.server.protocol.parse(data.decode('utf-8'))
         if reply:
             socket.sendto(reply.encode(), self.client_address)
