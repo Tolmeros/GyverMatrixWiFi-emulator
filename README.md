@@ -4,8 +4,8 @@
 
 # Requirments
 
-Python 3.x
-Python Tkinter.
+* Python 3.x
+* Python Tkinter.
 
 ## Ubuntu
 
