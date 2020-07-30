@@ -1,11 +1,6 @@
-#!/usr/bin/env python
-try:
-    import socketserver
-except ImportError: # Python 2:
-    import SocketServer as socketserver
-
 import re
 import socket
+import socketserver
 import threading
 
 
